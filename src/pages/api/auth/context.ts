@@ -36,7 +36,7 @@ export default async function handler(
 
     // Get or create local user by Renaissance ID
     const user = await getOrCreateUserByRenaissanceId(String(renaissanceUserId), {
-      renaissanceUserId: String(renaissanceUserId),
+      renaissanceId: String(renaissanceUserId),
       username: userData?.username,
       displayName: userData?.displayName,
       pfpUrl: userData?.pfpUrl,
