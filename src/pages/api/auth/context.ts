@@ -56,7 +56,7 @@ export default async function handler(
       success: true,
       user: {
         id: user.id,
-        fid: user.fid,
+        renaissanceId: user.renaissanceId,
         username: user.username,
         name: user.name,
         displayName: user.displayName,

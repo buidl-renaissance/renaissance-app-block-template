@@ -1,5 +1,6 @@
 CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
+	`renaissanceId` text,
 	`phone` text,
 	`email` text,
 	`username` text,
@@ -17,4 +18,5 @@ CREATE TABLE `users` (
 	`updatedAt` integer DEFAULT (strftime('%s', 'now')) NOT NULL
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `users_renaissanceId_unique` ON `users` (`renaissanceId`);--> statement-breakpoint
 CREATE UNIQUE INDEX `users_phone_unique` ON `users` (`phone`);

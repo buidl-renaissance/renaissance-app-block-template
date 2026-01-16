@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getUserByPhone, getUserByUsername, createUserWithPhone } from '@/db/user';
 
 interface PendingUserData {
-  fid?: string;
+  renaissanceId?: string;
   username?: string;
   displayName?: string;
   pfpUrl?: string;
@@ -92,7 +92,7 @@ export default async function handler(
       email: email?.trim() || undefined,
       // Link Renaissance data if provided
       accountAddress: pendingUserData?.accountAddress,
-      fid: pendingUserData?.fid,
+      renaissanceId: pendingUserData?.renaissanceId,
       pfpUrl: pendingUserData?.pfpUrl,
     });
 

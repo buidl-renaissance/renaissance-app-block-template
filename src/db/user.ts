@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { eq, count, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { db } from './drizzle';
-import { users, farcasterAccounts, UserRole, UserStatus, USER_STATUSES } from './schema';
+import { users, UserRole, UserStatus, USER_STATUSES } from './schema';
 
 const BCRYPT_ROUNDS = 10;
 const MAX_FAILED_ATTEMPTS = 3;
@@ -12,7 +12,7 @@ export type { UserStatus };
 
 export interface User {
   id: string;
-  fid?: string | null; // Legacy field - kept for backwards compatibility
+  renaissanceId?: string | null; // Renaissance app user ID
   phone?: string | null; // Primary login method
   email?: string | null; // Optional
   username?: string | null;
@@ -36,42 +36,11 @@ function getFailedAttempts(value: number | null | undefined): number {
   return value ?? 0;
 }
 
-// Legacy types - kept for backwards compatibility
-export interface FarcasterAccount {
-  id: string;
-  userId: string;
-  fid: string;
-  username: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface FarcasterUserData {
-  fid: string;
-  username?: string;
-  name?: string;
-  displayName?: string;
-  pfpUrl?: string;
-  accountAddress?: string;
-}
-
-// ============================================
-// USER LOOKUP FUNCTIONS
-// ============================================
-
-export async function getUserByFid(fid: string): Promise<User | null> {
-  const results = await db
-    .select()
-    .from(users)
-    .where(eq(users.fid, fid))
-    .limit(1);
-  
-  if (results.length === 0) return null;
-  
-  const row = results[0];
+// Helper to convert db row to User object
+function rowToUser(row: typeof users.$inferSelect): User {
   return {
     id: row.id,
-    fid: row.fid,
+    renaissanceId: row.renaissanceId,
     phone: row.phone,
     email: row.email,
     username: row.username,
@@ -83,12 +52,16 @@ export async function getUserByFid(fid: string): Promise<User | null> {
     pinHash: row.pinHash,
     failedPinAttempts: getFailedAttempts(row.failedPinAttempts),
     lockedAt: row.lockedAt || null,
-    status: (row.status as UserStatus | null),
+    status: row.status as UserStatus | null,
     role: row.role,
     createdAt: row.createdAt || new Date(),
     updatedAt: row.updatedAt || new Date(),
-  } as User;
+  };
 }
+
+// ============================================
+// USER LOOKUP FUNCTIONS
+// ============================================
 
 export async function getUserById(userId: string): Promise<User | null> {
   const results = await db
@@ -98,27 +71,7 @@ export async function getUserById(userId: string): Promise<User | null> {
     .limit(1);
   
   if (results.length === 0) return null;
-  
-  const row = results[0];
-  return {
-    id: row.id,
-    fid: row.fid,
-    phone: row.phone,
-    email: row.email,
-    username: row.username,
-    name: row.name,
-    pfpUrl: row.pfpUrl,
-    displayName: row.displayName,
-    profilePicture: row.profilePicture,
-    accountAddress: row.accountAddress,
-    pinHash: row.pinHash,
-    failedPinAttempts: getFailedAttempts(row.failedPinAttempts),
-    lockedAt: row.lockedAt || null,
-    status: (row.status as UserStatus | null),
-    role: row.role,
-    createdAt: row.createdAt || new Date(),
-    updatedAt: row.updatedAt || new Date(),
-  } as User;
+  return rowToUser(results[0]);
 }
 
 export async function getUserByPhone(phone: string): Promise<User | null> {
@@ -129,27 +82,7 @@ export async function getUserByPhone(phone: string): Promise<User | null> {
     .limit(1);
   
   if (results.length === 0) return null;
-  
-  const row = results[0];
-  return {
-    id: row.id,
-    fid: row.fid,
-    phone: row.phone,
-    email: row.email,
-    username: row.username,
-    name: row.name,
-    pfpUrl: row.pfpUrl,
-    displayName: row.displayName,
-    profilePicture: row.profilePicture,
-    accountAddress: row.accountAddress,
-    pinHash: row.pinHash,
-    failedPinAttempts: getFailedAttempts(row.failedPinAttempts),
-    lockedAt: row.lockedAt || null,
-    status: (row.status as UserStatus | null),
-    role: row.role,
-    createdAt: row.createdAt || new Date(),
-    updatedAt: row.updatedAt || new Date(),
-  } as User;
+  return rowToUser(results[0]);
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
@@ -161,27 +94,7 @@ export async function getUserByUsername(username: string): Promise<User | null> 
     .limit(1);
   
   if (results.length === 0) return null;
-  
-  const row = results[0];
-  return {
-    id: row.id,
-    fid: row.fid,
-    phone: row.phone,
-    email: row.email,
-    username: row.username,
-    name: row.name,
-    pfpUrl: row.pfpUrl,
-    displayName: row.displayName,
-    profilePicture: row.profilePicture,
-    accountAddress: row.accountAddress,
-    pinHash: row.pinHash,
-    failedPinAttempts: getFailedAttempts(row.failedPinAttempts),
-    lockedAt: row.lockedAt || null,
-    status: (row.status as UserStatus | null),
-    role: row.role,
-    createdAt: row.createdAt || new Date(),
-    updatedAt: row.updatedAt || new Date(),
-  } as User;
+  return rowToUser(results[0]);
 }
 
 export async function getUserByAccountAddress(accountAddress: string): Promise<User | null> {
@@ -192,27 +105,18 @@ export async function getUserByAccountAddress(accountAddress: string): Promise<U
     .limit(1);
   
   if (results.length === 0) return null;
+  return rowToUser(results[0]);
+}
+
+export async function getUserByRenaissanceId(renaissanceId: string): Promise<User | null> {
+  const results = await db
+    .select()
+    .from(users)
+    .where(eq(users.renaissanceId, renaissanceId))
+    .limit(1);
   
-  const row = results[0];
-  return {
-    id: row.id,
-    fid: row.fid,
-    phone: row.phone,
-    email: row.email,
-    username: row.username,
-    name: row.name,
-    pfpUrl: row.pfpUrl,
-    displayName: row.displayName,
-    profilePicture: row.profilePicture,
-    accountAddress: row.accountAddress,
-    pinHash: row.pinHash,
-    failedPinAttempts: getFailedAttempts(row.failedPinAttempts),
-    lockedAt: row.lockedAt || null,
-    status: (row.status as UserStatus | null),
-    role: row.role,
-    createdAt: row.createdAt || new Date(),
-    updatedAt: row.updatedAt || new Date(),
-  } as User;
+  if (results.length === 0) return null;
+  return rowToUser(results[0]);
 }
 
 // ============================================
@@ -221,13 +125,13 @@ export async function getUserByAccountAddress(accountAddress: string): Promise<U
 
 export interface CreateUserWithPhoneData {
   username: string;
-  displayName: string; // name
+  displayName: string;
   phone: string;
   email?: string;
   pin: string; // 4-digit PIN (will be hashed before storage)
-  // Optional Renaissance/Farcaster data
+  // Optional Renaissance data
   accountAddress?: string;
-  fid?: string;
+  renaissanceId?: string;
   pfpUrl?: string;
 }
 
@@ -246,14 +150,14 @@ export async function createUserWithPhone(data: CreateUserWithPhoneData): Promis
   
   const newUser = {
     id,
-    fid: data.fid || null,
+    renaissanceId: data.renaissanceId || null,
     phone: data.phone,
     email: data.email || null,
     username: data.username,
     displayName: data.displayName,
     pfpUrl: data.pfpUrl || null,
-    profilePicture: data.pfpUrl || null, // Initialize with pfpUrl if provided
-    accountAddress: data.accountAddress || null, // From Renaissance auth
+    profilePicture: data.pfpUrl || null,
+    accountAddress: data.accountAddress || null,
     pinHash,
     failedPinAttempts: 0,
     lockedAt: null,
@@ -273,15 +177,12 @@ export async function createUserWithPhone(data: CreateUserWithPhoneData): Promis
     role,
   });
   
-  return {
-    ...newUser,
-    lockedAt: null,
-  } as User;
+  return { ...newUser, lockedAt: null } as User;
 }
 
 export interface UpdateUserProfileData {
   displayName?: string;
-  profilePicture?: string | null; // App-specific profile picture (editable)
+  profilePicture?: string | null;
   phone?: string;
 }
 
@@ -292,539 +193,66 @@ export async function updateUserProfile(userId: string, data: UpdateUserProfileD
   const now = new Date();
   const updateData: { displayName?: string; profilePicture?: string | null; phone?: string; updatedAt: Date } = { updatedAt: now };
 
-  if (data.displayName !== undefined) {
-    updateData.displayName = data.displayName;
-  }
-  if (data.profilePicture !== undefined) {
-    updateData.profilePicture = data.profilePicture;
-  }
-  if (data.phone !== undefined) {
-    updateData.phone = data.phone;
-  }
+  if (data.displayName !== undefined) updateData.displayName = data.displayName;
+  if (data.profilePicture !== undefined) updateData.profilePicture = data.profilePicture;
+  if (data.phone !== undefined) updateData.phone = data.phone;
 
-  await db
-    .update(users)
-    .set(updateData)
-    .where(eq(users.id, userId));
+  await db.update(users).set(updateData).where(eq(users.id, userId));
 
-  return {
-    ...existing,
-    ...updateData,
-  } as User;
+  return { ...existing, ...updateData } as User;
 }
 
 // ============================================
-// USERNAME/ACCOUNT ADDRESS LOOKUP (for Renaissance flow)
+// RENAISSANCE DATA LINKING
 // ============================================
 
+export interface RenaissanceUserData {
+  renaissanceId?: string;
+  username?: string;
+  name?: string;
+  displayName?: string;
+  pfpUrl?: string;
+  accountAddress?: string;
+  publicAddress?: string;
+}
+
 /**
- * Link an accountAddress to an existing user (found by phone)
- * Called after user enters phone number and is found/created
+ * Link Renaissance data to an existing user
  */
 export async function linkAccountAddressToUser(
   userId: string,
   accountAddress: string,
-  userData?: FarcasterUserData
+  userData?: RenaissanceUserData
 ): Promise<User | null> {
   const existing = await getUserById(userId);
   if (!existing) return null;
   
   const now = new Date();
-  const updateData: {
-    fid?: string | null;
-    username?: string | null;
-    name?: string | null;
-    pfpUrl?: string | null;
-    accountAddress: string;
-    updatedAt: Date;
-  } = { 
+  const updateData: Record<string, unknown> = { 
     accountAddress,
     updatedAt: now,
   };
   
-  // Also sync other Renaissance data if provided
-  if (userData?.fid) updateData.fid = userData.fid;
+  if (userData?.renaissanceId) updateData.renaissanceId = userData.renaissanceId;
   if (userData?.username) updateData.username = userData.username;
   if (userData?.name) updateData.name = userData.name;
   if (userData?.pfpUrl) updateData.pfpUrl = userData.pfpUrl;
   
-  await db
-    .update(users)
-    .set(updateData)
-    .where(eq(users.id, userId));
+  await db.update(users).set(updateData).where(eq(users.id, userId));
   
-  console.log('🔗 [USER LOOKUP] Linked accountAddress to user:', { userId, accountAddress });
+  console.log('🔗 [USER] Linked accountAddress to user:', { userId, accountAddress });
   
-  return {
-    ...existing,
-    ...updateData,
-  };
-}
-
-// ============================================
-// FARCASTER ACCOUNT MANAGEMENT
-// ============================================
-
-export async function getOrCreateUserByFid(
-  fid: string,
-  userData?: FarcasterUserData
-): Promise<User> {
-  // Try accountAddress lookup first
-  if (userData?.accountAddress) {
-    const existing = await getUserByAccountAddress(userData.accountAddress);
-    if (existing) {
-      return existing;
-    }
-  }
-  
-  const existing = await getUserByFid(fid);
-  
-  if (existing) {
-    // Update user if new data is provided
-    if (userData) {
-      const now = new Date();
-      const updateData: {
-        username?: string | null;
-        name?: string | null;
-        displayName?: string | null;
-        pfpUrl?: string | null;
-        accountAddress?: string | null;
-        role?: UserRole;
-        updatedAt: Date;
-      } = { updatedAt: now };
-      
-      if (userData.username !== undefined) updateData.username = userData.username;
-      if (userData.name !== undefined) updateData.name = userData.name;
-      if (userData.displayName !== undefined) updateData.displayName = userData.displayName;
-      if (userData.pfpUrl !== undefined) updateData.pfpUrl = userData.pfpUrl;
-      if (userData.accountAddress !== undefined) updateData.accountAddress = userData.accountAddress;
-      
-      await db
-        .update(users)
-        .set(updateData)
-        .where(eq(users.id, existing.id));
-      
-      return {
-        ...existing,
-        ...updateData,
-      } as User;
-    }
-    
-    return existing;
-  }
-  
-  // Check if this is the first user - if so, make them admin
-  const userCount = await db.select({ count: count() }).from(users);
-  const isFirstUser = userCount[0].count === 0;
-  
-  const role: UserRole = isFirstUser ? 'admin' : 'user';
-  
-  // Create new user
-  const id = uuidv4();
-  const now = new Date();
-  const newUser = {
-    id,
-    fid,
-    username: userData?.username || null,
-    name: userData?.name || null,
-    displayName: userData?.displayName || null,
-    pfpUrl: userData?.pfpUrl || null,
-    profilePicture: userData?.pfpUrl || null,
-    accountAddress: userData?.accountAddress || null,
-    status: 'active' as UserStatus,
-    role,
-    createdAt: now,
-    updatedAt: now,
-  };
-  
-  console.log('🆕 [USER LOOKUP] Creating new user:', { fid, accountAddress: userData?.accountAddress, username: userData?.username, role });
-  
-  await db.insert(users).values(newUser);
-  
-  return newUser as User;
-}
-
-export async function upsertFarcasterAccount(
-  userId: string,
-  farcasterData: { fid: string; username: string }
-): Promise<FarcasterAccount> {
-  const existing = await db
-    .select()
-    .from(farcasterAccounts)
-    .where(eq(farcasterAccounts.fid, farcasterData.fid))
-    .limit(1);
-  
-  const now = new Date();
-  
-  if (existing.length > 0) {
-    const existingAccount = existing[0];
-    await db
-      .update(farcasterAccounts)
-      .set({
-        userId,
-        username: farcasterData.username,
-        updatedAt: now,
-      })
-      .where(eq(farcasterAccounts.id, existingAccount.id));
-    
-    return {
-      id: existingAccount.id,
-      userId,
-      fid: farcasterData.fid,
-      username: farcasterData.username,
-      createdAt: existingAccount.createdAt || now,
-      updatedAt: now,
-    } as FarcasterAccount;
-  }
-  
-  const id = uuidv4();
-  const record = {
-    id,
-    userId,
-    fid: farcasterData.fid,
-    username: farcasterData.username,
-    createdAt: now,
-    updatedAt: now,
-  };
-  
-  await db.insert(farcasterAccounts).values(record);
-  return record as FarcasterAccount;
-}
-
-export async function getFarcasterAccountByFid(
-  fid: string
-): Promise<FarcasterAccount | null> {
-  const results = await db
-    .select()
-    .from(farcasterAccounts)
-    .where(eq(farcasterAccounts.fid, fid))
-    .limit(1);
-  
-  if (results.length === 0) return null;
-  
-  const row = results[0];
-  return {
-    id: row.id,
-    userId: row.userId,
-    fid: row.fid,
-    username: row.username,
-    createdAt: row.createdAt || new Date(),
-    updatedAt: row.updatedAt || new Date(),
-  } as FarcasterAccount;
-}
-
-// ============================================
-// PIN SECURITY FUNCTIONS
-// ============================================
-
-/**
- * Check if a user account is currently locked
- */
-export function isUserLocked(user: User): boolean {
-  return user.lockedAt !== null && user.lockedAt !== undefined;
+  return { ...existing, ...updateData } as User;
 }
 
 /**
- * Check if a user has a PIN set
+ * Get or create user by Renaissance ID (for context injection auth)
  */
-export function hasPin(user: User): boolean {
-  return user.pinHash !== null && user.pinHash !== undefined;
-}
-
-/**
- * Verify a user's PIN
- * Returns true if PIN is correct, false otherwise
- */
-export async function verifyUserPin(user: User, pin: string): Promise<boolean> {
-  if (!user.pinHash) return false;
-  return bcrypt.compare(pin, user.pinHash);
-}
-
-/**
- * Increment failed PIN attempts for a user
- * Returns the updated user and whether the account was locked
- */
-export async function incrementFailedAttempts(userId: string): Promise<{ user: User; wasLocked: boolean }> {
-  const existing = await getUserById(userId);
-  if (!existing) throw new Error('User not found');
-
-  const now = new Date();
-  const newAttempts = existing.failedPinAttempts + 1;
-  const shouldLock = newAttempts >= MAX_FAILED_ATTEMPTS;
-
-  await db
-    .update(users)
-    .set({
-      failedPinAttempts: newAttempts,
-      lockedAt: shouldLock ? now : existing.lockedAt,
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
-
-  return {
-    user: {
-      ...existing,
-      failedPinAttempts: newAttempts,
-      lockedAt: shouldLock ? now : existing.lockedAt,
-      updatedAt: now,
-    },
-    wasLocked: shouldLock,
-  };
-}
-
-/**
- * Reset failed PIN attempts (called on successful login)
- */
-export async function resetFailedAttempts(userId: string): Promise<void> {
-  const now = new Date();
-  await db
-    .update(users)
-    .set({
-      failedPinAttempts: 0,
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
-}
-
-/**
- * Lock a user account
- */
-export async function lockUser(userId: string): Promise<User | null> {
-  const existing = await getUserById(userId);
-  if (!existing) return null;
-
-  const now = new Date();
-  await db
-    .update(users)
-    .set({
-      lockedAt: now,
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
-
-  return {
-    ...existing,
-    lockedAt: now,
-    updatedAt: now,
-  };
-}
-
-/**
- * Unlock a user account (admin function)
- * Also resets failed PIN attempts
- */
-export async function unlockUser(userId: string): Promise<User | null> {
-  const existing = await getUserById(userId);
-  if (!existing) return null;
-
-  const now = new Date();
-  await db
-    .update(users)
-    .set({
-      lockedAt: null,
-      failedPinAttempts: 0,
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
-
-  return {
-    ...existing,
-    lockedAt: null,
-    failedPinAttempts: 0,
-    updatedAt: now,
-  };
-}
-
-/**
- * Set a user's PIN (for users who don't have one yet)
- */
-export async function setUserPin(userId: string, pin: string): Promise<User | null> {
-  const existing = await getUserById(userId);
-  if (!existing) return null;
-
-  const now = new Date();
-  const pinHash = await bcrypt.hash(pin, BCRYPT_ROUNDS);
-
-  await db
-    .update(users)
-    .set({
-      pinHash,
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
-
-  return {
-    ...existing,
-    pinHash,
-    updatedAt: now,
-  };
-}
-
-/**
- * Update a user's PIN (requires verification of current PIN first)
- * This should be called after verifyUserPin succeeds
- */
-export async function updateUserPin(userId: string, newPin: string): Promise<User | null> {
-  const existing = await getUserById(userId);
-  if (!existing) return null;
-
-  const now = new Date();
-  const pinHash = await bcrypt.hash(newPin, BCRYPT_ROUNDS);
-
-  await db
-    .update(users)
-    .set({
-      pinHash,
-      failedPinAttempts: 0, // Reset failed attempts on successful PIN change
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
-
-  return {
-    ...existing,
-    pinHash,
-    failedPinAttempts: 0,
-    updatedAt: now,
-  };
-}
-
-// ============================================
-// USER STATUS FUNCTIONS
-// ============================================
-
-/**
- * Update a user's status (admin function)
- * @param userId - The user ID to update
- * @param status - The new status: 'active', 'inactive', or 'banned'
- */
-export async function updateUserStatus(userId: string, status: UserStatus): Promise<User | null> {
-  const existing = await getUserById(userId);
-  if (!existing) return null;
-
-  const now = new Date();
-  await db
-    .update(users)
-    .set({
-      status,
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
-
-  console.log('🔄 [USER STATUS] Updated user status:', { userId, status });
-
-  return {
-    ...existing,
-    status,
-    updatedAt: now,
-  };
-}
-
-/**
- * Check if a user is active (not inactive or banned)
- * Note: null status is treated as active
- */
-export function isUserActive(user: User): boolean {
-  return user.status === 'active' || user.status === null;
-}
-
-/**
- * Check if a user is banned
- */
-export function isUserBanned(user: User): boolean {
-  return user.status === 'banned';
-}
-
-// ============================================
-// ROLE MANAGEMENT
-// ============================================
-
-export async function updateUserRole(userId: string, role: UserRole): Promise<User | null> {
-  const user = await getUserById(userId);
-  if (!user) return null;
-  
-  const now = new Date();
-  await db
-    .update(users)
-    .set({ role, updatedAt: now })
-    .where(eq(users.id, userId));
-  
-  return { ...user, role, updatedAt: now };
-}
-
-export async function promoteToOrganizer(userId: string): Promise<User | null> {
-  return updateUserRole(userId, 'organizer');
-}
-
-export async function promoteToAdmin(userId: string): Promise<User | null> {
-  return updateUserRole(userId, 'admin');
-}
-
-export async function demoteToUser(userId: string): Promise<User | null> {
-  return updateUserRole(userId, 'user');
-}
-
-// Access control helpers
-export function canManageUsers(user: User): boolean {
-  return user.role === 'admin';
-}
-
-export function isOrganizer(user: User): boolean {
-  return user.role === 'admin' || user.role === 'organizer';
-}
-
-export function isAdmin(user: User): boolean {
-  return user.role === 'admin';
-}
-
-// ============================================
-// RENAISSANCE ID FUNCTIONS
-// ============================================
-
-export async function getUserByRenaissanceId(renaissanceId: string): Promise<User | null> {
-  // Use fid field to store renaissanceUserId
-  const results = await db
-    .select()
-    .from(users)
-    .where(eq(users.fid, renaissanceId))
-    .limit(1);
-  
-  if (results.length === 0) return null;
-  
-  const row = results[0];
-  return {
-    id: row.id,
-    fid: row.fid,
-    phone: row.phone,
-    email: row.email,
-    username: row.username,
-    name: row.name,
-    pfpUrl: row.pfpUrl,
-    displayName: row.displayName,
-    profilePicture: row.profilePicture,
-    accountAddress: row.accountAddress,
-    pinHash: row.pinHash,
-    failedPinAttempts: getFailedAttempts(row.failedPinAttempts),
-    lockedAt: row.lockedAt || null,
-    status: (row.status as UserStatus | null),
-    role: row.role,
-    createdAt: row.createdAt || new Date(),
-    updatedAt: row.updatedAt || new Date(),
-  } as User;
-}
-
-export interface RenaissanceUserData {
-  renaissanceUserId: string;
-  username?: string;
-  displayName?: string;
-  pfpUrl?: string;
-  publicAddress?: string;
-}
-
 export async function getOrCreateUserByRenaissanceId(
   renaissanceUserId: string,
   userData?: RenaissanceUserData
 ): Promise<User> {
-  // First try to find existing user by renaissanceUserId (stored in fid)
+  // First try to find existing user by renaissanceId
   const existing = await getUserByRenaissanceId(renaissanceUserId);
   
   if (existing) {
@@ -837,11 +265,9 @@ export async function getOrCreateUserByRenaissanceId(
       if (userData.displayName) updateData.name = userData.displayName;
       if (userData.pfpUrl) updateData.pfpUrl = userData.pfpUrl;
       if (userData.publicAddress) updateData.accountAddress = userData.publicAddress;
+      if (userData.accountAddress) updateData.accountAddress = userData.accountAddress;
       
-      await db
-        .update(users)
-        .set(updateData)
-        .where(eq(users.id, existing.id));
+      await db.update(users).set(updateData).where(eq(users.id, existing.id));
       
       return { ...existing, ...updateData, updatedAt: now } as User;
     }
@@ -852,23 +278,21 @@ export async function getOrCreateUserByRenaissanceId(
   if (userData?.username) {
     const existingByUsername = await getUserByUsername(userData.username);
     if (existingByUsername) {
-      // Link renaissanceUserId to existing user
+      // Link renaissanceId to existing user
       const now = new Date();
       const updateData: Record<string, unknown> = {
-        fid: renaissanceUserId,
+        renaissanceId: renaissanceUserId,
         updatedAt: now,
       };
       
       if (userData.displayName) updateData.name = userData.displayName;
       if (userData.pfpUrl) updateData.pfpUrl = userData.pfpUrl;
       if (userData.publicAddress) updateData.accountAddress = userData.publicAddress;
+      if (userData.accountAddress) updateData.accountAddress = userData.accountAddress;
       
-      await db
-        .update(users)
-        .set(updateData)
-        .where(eq(users.id, existingByUsername.id));
+      await db.update(users).set(updateData).where(eq(users.id, existingByUsername.id));
       
-      console.log('🔗 [RENAISSANCE] Linked renaissanceUserId to existing user:', {
+      console.log('🔗 [RENAISSANCE] Linked renaissanceId to existing user:', {
         userId: existingByUsername.id,
         renaissanceUserId,
         username: userData.username,
@@ -879,7 +303,6 @@ export async function getOrCreateUserByRenaissanceId(
   }
   
   // Create new user
-  // Check if this is the first user - if so, make them admin
   const userCount = await db.select({ count: count() }).from(users);
   const isFirstUser = userCount[0].count === 0;
   
@@ -889,13 +312,13 @@ export async function getOrCreateUserByRenaissanceId(
   
   const newUser = {
     id,
-    fid: renaissanceUserId,
+    renaissanceId: renaissanceUserId,
     username: userData?.username || null,
     name: userData?.displayName || null,
     displayName: userData?.displayName || null,
     pfpUrl: userData?.pfpUrl || null,
     profilePicture: userData?.pfpUrl || null,
-    accountAddress: userData?.publicAddress || null,
+    accountAddress: userData?.publicAddress || userData?.accountAddress || null,
     status: 'active' as UserStatus,
     role,
     createdAt: now,
@@ -912,4 +335,152 @@ export async function getOrCreateUserByRenaissanceId(
   });
   
   return newUser as User;
+}
+
+// ============================================
+// PIN SECURITY FUNCTIONS
+// ============================================
+
+export function isUserLocked(user: User): boolean {
+  return user.lockedAt !== null && user.lockedAt !== undefined;
+}
+
+export function hasPin(user: User): boolean {
+  return user.pinHash !== null && user.pinHash !== undefined;
+}
+
+export async function verifyUserPin(user: User, pin: string): Promise<boolean> {
+  if (!user.pinHash) return false;
+  return bcrypt.compare(pin, user.pinHash);
+}
+
+export async function incrementFailedAttempts(userId: string): Promise<{ user: User; wasLocked: boolean }> {
+  const existing = await getUserById(userId);
+  if (!existing) throw new Error('User not found');
+
+  const now = new Date();
+  const newAttempts = existing.failedPinAttempts + 1;
+  const shouldLock = newAttempts >= MAX_FAILED_ATTEMPTS;
+
+  await db.update(users).set({
+    failedPinAttempts: newAttempts,
+    lockedAt: shouldLock ? now : existing.lockedAt,
+    updatedAt: now,
+  }).where(eq(users.id, userId));
+
+  return {
+    user: { ...existing, failedPinAttempts: newAttempts, lockedAt: shouldLock ? now : existing.lockedAt, updatedAt: now },
+    wasLocked: shouldLock,
+  };
+}
+
+export async function resetFailedAttempts(userId: string): Promise<void> {
+  const now = new Date();
+  await db.update(users).set({ failedPinAttempts: 0, updatedAt: now }).where(eq(users.id, userId));
+}
+
+export async function lockUser(userId: string): Promise<User | null> {
+  const existing = await getUserById(userId);
+  if (!existing) return null;
+
+  const now = new Date();
+  await db.update(users).set({ lockedAt: now, updatedAt: now }).where(eq(users.id, userId));
+
+  return { ...existing, lockedAt: now, updatedAt: now };
+}
+
+export async function unlockUser(userId: string): Promise<User | null> {
+  const existing = await getUserById(userId);
+  if (!existing) return null;
+
+  const now = new Date();
+  await db.update(users).set({ lockedAt: null, failedPinAttempts: 0, updatedAt: now }).where(eq(users.id, userId));
+
+  return { ...existing, lockedAt: null, failedPinAttempts: 0, updatedAt: now };
+}
+
+export async function setUserPin(userId: string, pin: string): Promise<User | null> {
+  const existing = await getUserById(userId);
+  if (!existing) return null;
+
+  const now = new Date();
+  const pinHash = await bcrypt.hash(pin, BCRYPT_ROUNDS);
+
+  await db.update(users).set({ pinHash, updatedAt: now }).where(eq(users.id, userId));
+
+  return { ...existing, pinHash, updatedAt: now };
+}
+
+export async function updateUserPin(userId: string, newPin: string): Promise<User | null> {
+  const existing = await getUserById(userId);
+  if (!existing) return null;
+
+  const now = new Date();
+  const pinHash = await bcrypt.hash(newPin, BCRYPT_ROUNDS);
+
+  await db.update(users).set({ pinHash, failedPinAttempts: 0, updatedAt: now }).where(eq(users.id, userId));
+
+  return { ...existing, pinHash, failedPinAttempts: 0, updatedAt: now };
+}
+
+// ============================================
+// USER STATUS FUNCTIONS
+// ============================================
+
+export async function updateUserStatus(userId: string, status: UserStatus): Promise<User | null> {
+  const existing = await getUserById(userId);
+  if (!existing) return null;
+
+  const now = new Date();
+  await db.update(users).set({ status, updatedAt: now }).where(eq(users.id, userId));
+
+  console.log('🔄 [USER STATUS] Updated user status:', { userId, status });
+
+  return { ...existing, status, updatedAt: now };
+}
+
+export function isUserActive(user: User): boolean {
+  return user.status === 'active' || user.status === null;
+}
+
+export function isUserBanned(user: User): boolean {
+  return user.status === 'banned';
+}
+
+// ============================================
+// ROLE MANAGEMENT
+// ============================================
+
+export async function updateUserRole(userId: string, role: UserRole): Promise<User | null> {
+  const user = await getUserById(userId);
+  if (!user) return null;
+  
+  const now = new Date();
+  await db.update(users).set({ role, updatedAt: now }).where(eq(users.id, userId));
+  
+  return { ...user, role, updatedAt: now };
+}
+
+export async function promoteToOrganizer(userId: string): Promise<User | null> {
+  return updateUserRole(userId, 'organizer');
+}
+
+export async function promoteToAdmin(userId: string): Promise<User | null> {
+  return updateUserRole(userId, 'admin');
+}
+
+export async function demoteToUser(userId: string): Promise<User | null> {
+  return updateUserRole(userId, 'user');
+}
+
+export function canManageUsers(user: User): boolean {
+  return user.role === 'admin';
+}
+
+export function isOrganizer(user: User): boolean {
+  return user.role === 'admin' || user.role === 'organizer';
+}
+
+export function isAdmin(user: User): boolean {
+  return user.role === 'admin';
 }

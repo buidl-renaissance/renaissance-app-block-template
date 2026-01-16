@@ -10,7 +10,7 @@ import {
 } from '@/db/user';
 
 interface PendingUserData {
-  fid?: string;
+  renaissanceId?: string;
   username?: string;
   displayName?: string;
   pfpUrl?: string;
@@ -143,7 +143,7 @@ export default async function handler(
         accountAddress: pendingUserData.accountAddress,
       });
       const linked = await linkAccountAddressToUser(user.id, pendingUserData.accountAddress, {
-        fid: pendingUserData.fid || '',
+        renaissanceId: pendingUserData.renaissanceId,
         username: pendingUserData.username,
         name: pendingUserData.displayName,
         pfpUrl: pendingUserData.pfpUrl,
@@ -172,7 +172,7 @@ export default async function handler(
         displayName: updatedUser.displayName,
         phone: updatedUser.phone,
         email: updatedUser.email,
-        fid: updatedUser.fid,
+        renaissanceId: updatedUser.renaissanceId,
         pfpUrl: updatedUser.pfpUrl,
         accountAddress: updatedUser.accountAddress,
         role: updatedUser.role,

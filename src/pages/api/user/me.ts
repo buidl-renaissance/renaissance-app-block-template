@@ -5,7 +5,7 @@ import { UserRole } from '@/db/schema';
 type ResponseData = {
   user: {
     id: string;
-    fid: string | null;
+    renaissanceId: string | null;
     username: string | null;
     name: string | null;
     displayName: string | null;
@@ -57,7 +57,7 @@ export default async function handler(
     }
 
     if (user) {
-      console.log(`✅ User found via ${source}:`, { id: user.id, fid: user.fid, username: user.username });
+      console.log(`✅ User found via ${source}:`, { id: user.id, renaissanceId: user.renaissanceId, username: user.username });
     } else {
       console.log('❌ No user found in /api/user/me, clearing cookie');
       // Clear invalid session cookie
@@ -74,7 +74,7 @@ export default async function handler(
     return res.status(200).json({
       user: {
         id: user.id,
-        fid: user.fid ?? null,
+        renaissanceId: user.renaissanceId ?? null,
         username: user.username ?? null,
         name: user.name ?? null,
         displayName: user.displayName ?? null,

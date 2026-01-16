@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a65ccb3b-e08d-4241-a0c2-24ff6e29889b",
+  "id": "e9fc613e-013b-4c76-85a7-f5d2081a53a2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "users": {
@@ -12,6 +12,13 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true,
+          "autoincrement": false
+        },
+        "renaissanceId": {
+          "name": "renaissanceId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "phone": {
@@ -126,6 +133,13 @@
         }
       },
       "indexes": {
+        "users_renaissanceId_unique": {
+          "name": "users_renaissanceId_unique",
+          "columns": [
+            "renaissanceId"
+          ],
+          "isUnique": true
+        },
         "users_phone_unique": {
           "name": "users_phone_unique",
           "columns": [

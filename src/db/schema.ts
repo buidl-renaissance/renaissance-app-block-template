@@ -11,6 +11,7 @@ export type UserStatus = typeof USER_STATUSES[number];
 // Users table
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
+  renaissanceId: text('renaissanceId').unique(), // Renaissance app user ID
   phone: text('phone').unique(), // Primary login method
   email: text('email'), // Optional
   username: text('username'),
