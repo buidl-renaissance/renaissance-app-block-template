@@ -119,6 +119,7 @@ const FeatureSection = styled.section<{ $delay: number }>`
   flex-direction: column;
   gap: 1rem;
   width: 100%;
+  max-width: 320px;
   animation: ${fadeUp} 0.6s ease-out both;
   animation-delay: ${({ $delay }) => $delay}ms;
 `;
@@ -161,9 +162,9 @@ const FeatureLabel = styled.span`
 const CTASection = styled.section<{ $delay: number }>`
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 1rem;
   width: 100%;
+  max-width: 320px;
   animation: ${fadeUp} 0.6s ease-out both;
   animation-delay: ${({ $delay }) => $delay}ms;
 `;
@@ -181,7 +182,6 @@ const EnterButton = styled(Link)<{ $active: boolean }>`
   border-radius: 2px;
   transition: all 0.2s ease;
   width: 100%;
-  max-width: 320px;
   text-align: center;
   
   ${({ $active }) => !$active && css`
@@ -194,17 +194,13 @@ const EnterButton = styled(Link)<{ $active: boolean }>`
     animation: ${subtleGlow} 2s ease-in-out infinite;
     color: ${({ theme }) => theme.signalWhite};
   }
-  
-  @media (max-width: 480px) {
-    width: 100%;
-    max-width: none;
-  }
 `;
 
 const CTAMicrocopy = styled.p`
   font-family: 'Inter', sans-serif;
   font-size: 0.75rem;
   color: ${({ theme }) => theme.textMuted};
+  text-align: center;
   opacity: 0.5;
   margin: 0;
 `;
