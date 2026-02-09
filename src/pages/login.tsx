@@ -629,10 +629,17 @@ export default function LoginPage() {
     return () => clearInterval(interval);
   }, [sessionExpiresAt, sessionToken]);
 
-  const getQRCodeUrl = () => {
+  // JSON format required by mobile app (type: renaissance_app_auth → POST to callbackUrl)
+  const getQRCodeData = () => {
     if (!sessionToken) return '';
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/api/auth/qr-authenticate?token=${sessionToken}`;
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    return JSON.stringify({
+      type: 'renaissance_app_auth',
+      token: sessionToken,
+      callbackUrl: `${baseUrl}/api/auth/qr-authenticate`,
+      appName: 'App',
+      expiresAt: sessionExpiresAt ?? undefined,
+    });
   };
 
   const formatTime = (seconds: number) => {
@@ -860,7 +867,7 @@ export default function LoginPage() {
                 <>
                   <QRCodeContainer>
                     <QRCodeSVG
-                      value={getQRCodeUrl()}
+                      value={getQRCodeData()}
                       size={200}
                       level="M"
                       includeMargin={false}
