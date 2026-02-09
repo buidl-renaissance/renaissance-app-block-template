@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import styled, { keyframes } from 'styled-components';
+import { QRCodeSVG } from 'qrcode.react';
 
 const pulseGlow = keyframes`
   0%, 100% {
@@ -191,6 +192,90 @@ const PhoneDisplay = styled.div`
   margin-bottom: 0.5rem;
 `;
 
+const TabRow = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+`;
+
+const Tab = styled.button<{ $active?: boolean }>`
+  flex: 1;
+  background: ${({ theme, $active }) => ($active ? theme.accentMuted : 'transparent')};
+  border: 1px solid ${({ theme, $active }) => ($active ? theme.accent : theme.border)};
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: ${({ theme, $active }) => ($active ? theme.accent : theme.textSecondary)};
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    border-color: ${({ theme }) => theme.accent};
+    color: ${({ theme }) => theme.text};
+  }
+`;
+
+const QRCodeContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.25rem;
+  background: ${({ theme }) => theme.background};
+  border-radius: 8px;
+  border: 1px solid ${({ theme }) => theme.border};
+  margin-bottom: 1rem;
+`;
+
+const StatusText = styled.p<{ $type?: 'error' }>`
+  font-size: 0.9rem;
+  color: ${({ theme, $type }) => ($type === 'error' ? theme.danger : theme.textSecondary)};
+  text-align: center;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+`;
+
+const TimerText = styled.span`
+  font-size: 0.8rem;
+  color: ${({ theme }) => theme.textMuted};
+`;
+
+const RefreshButton = styled.button`
+  background: transparent;
+  border: 1px solid ${({ theme }) => theme.accent};
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.accent};
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: all 0.2s;
+  &:hover {
+    background: ${({ theme }) => theme.accentMuted};
+  }
+`;
+
+const PulsingDot = styled.span`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.accent};
+  animation: ${pulseGlow} 1.5s ease-in-out infinite;
+`;
+
+const OpenAppLink = styled.a`
+  font-size: 0.85rem;
+  color: ${({ theme }) => theme.accent};
+  margin-top: 0.75rem;
+  display: inline-block;
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
 // Format phone number as user types: (XXX) XXX-XXXX or +1 (XXX) XXX-XXXX
 const formatPhoneNumber = (value: string): string => {
   // Strip all non-digit characters except leading +
@@ -231,6 +316,8 @@ const formatPhoneNumber = (value: string): string => {
 
 type LoginStep = 'phone' | 'pin' | 'setPin' | 'locked';
 
+const APP_AUTH_DEEP_LINK = 'renaissance://authenticate';
+
 export default function LoginPage() {
   const router = useRouter();
   const { redirect } = router.query;
@@ -242,6 +329,15 @@ export default function LoginPage() {
   const [step, setStep] = useState<LoginStep>('phone');
   const [normalizedPhone, setNormalizedPhone] = useState('');
   const [userName, setUserName] = useState('');
+
+  // QR login (desktop)
+  const [loginMode, setLoginMode] = useState<'phone' | 'qr'>('phone');
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState(0);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneNumber(e.target.value);
@@ -452,6 +548,105 @@ export default function LoginPage() {
     setError('');
   };
 
+  // Desktop detection for showing QR tab
+  useEffect(() => {
+    const check = () => setIsDesktop(typeof window !== 'undefined' && window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Create session for QR login
+  const createSession = useCallback(async () => {
+    setIsCreatingSession(true);
+    setQrError(null);
+    try {
+      const response = await fetch('/api/auth/session', { method: 'POST' });
+      const data = await response.json();
+      if (data.success && data.token) {
+        setSessionToken(data.token);
+        setSessionExpiresAt(data.expiresAt);
+      } else {
+        setQrError('Failed to create login session');
+      }
+    } catch (err) {
+      console.error('Error creating session:', err);
+      setQrError('Failed to create login session');
+    } finally {
+      setIsCreatingSession(false);
+    }
+  }, []);
+
+  // Create session when switching to QR mode
+  useEffect(() => {
+    if (loginMode === 'qr' && !sessionToken && !isCreatingSession) {
+      createSession();
+    }
+  }, [loginMode, sessionToken, isCreatingSession, createSession]);
+
+  // Poll for session authentication
+  useEffect(() => {
+    if (!sessionToken || loginMode !== 'qr') return;
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/auth/session?token=${sessionToken}`, {
+          credentials: 'include',
+        });
+        const data = await response.json();
+        if (data.authenticated) {
+          window.location.href = redirectUrl;
+        } else if (data.expired) {
+          setSessionToken(null);
+          setSessionExpiresAt(null);
+          createSession();
+        }
+      } catch (err) {
+        console.error('Error polling session:', err);
+      }
+    }, 2000);
+    return () => clearInterval(pollInterval);
+  }, [sessionToken, loginMode, redirectUrl, createSession]);
+
+  // QR session timer
+  useEffect(() => {
+    if (!sessionExpiresAt) {
+      setTimeRemaining(0);
+      return;
+    }
+    const updateTimer = () => {
+      const remaining = Math.max(
+        0,
+        Math.floor((sessionExpiresAt - Date.now()) / 1000)
+      );
+      setTimeRemaining(remaining);
+      if (remaining === 0 && sessionToken) {
+        setSessionToken(null);
+        setSessionExpiresAt(null);
+      }
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [sessionExpiresAt, sessionToken]);
+
+  const getQRCodeUrl = () => {
+    if (!sessionToken) return '';
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${origin}/api/auth/qr-authenticate?token=${sessionToken}`;
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleOpenApp = () => {
+    if (sessionToken) {
+      window.location.href = `${APP_AUTH_DEEP_LINK}?token=${sessionToken}&callback=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`;
+    }
+  };
+
   // Locked account view
   if (step === 'locked') {
     return (
@@ -597,7 +792,7 @@ export default function LoginPage() {
     );
   }
 
-  // Phone entry step (default)
+  // Phone entry step or QR login (default)
   return (
     <>
       <Head>
@@ -607,28 +802,89 @@ export default function LoginPage() {
       <Container>
         <FormCard>
           <Title>Sign In</Title>
-          <Subtitle>Enter your phone number to continue</Subtitle>
-          
-          <Form onSubmit={handlePhoneSubmit}>
-            {error && <ErrorMessage>{error}</ErrorMessage>}
-            
-            <FormGroup>
-              <Label>Phone Number</Label>
-              <Input
-                type="tel"
-                value={phone}
-                onChange={handlePhoneChange}
-                placeholder="+1 (555) 123-4567"
-                required
-                autoComplete="tel"
-                autoFocus
-              />
-            </FormGroup>
-            
-            <SubmitButton type="submit" disabled={loading} $loading={loading}>
-              {loading ? 'Checking...' : 'Continue'}
-            </SubmitButton>
-          </Form>
+          {isDesktop && (
+            <TabRow>
+              <Tab
+                $active={loginMode === 'phone'}
+                onClick={() => setLoginMode('phone')}
+                type="button"
+              >
+                Phone
+              </Tab>
+              <Tab
+                $active={loginMode === 'qr'}
+                onClick={() => setLoginMode('qr')}
+                type="button"
+              >
+                QR Code
+              </Tab>
+            </TabRow>
+          )}
+          {loginMode === 'phone' ? (
+            <>
+              <Subtitle>Enter your phone number to continue</Subtitle>
+              <Form onSubmit={handlePhoneSubmit}>
+                {error && <ErrorMessage>{error}</ErrorMessage>}
+                <FormGroup>
+                  <Label>Phone Number</Label>
+                  <Input
+                    type="tel"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    placeholder="+1 (555) 123-4567"
+                    required
+                    autoComplete="tel"
+                    autoFocus
+                  />
+                </FormGroup>
+                <SubmitButton type="submit" disabled={loading} $loading={loading}>
+                  {loading ? 'Checking...' : 'Continue'}
+                </SubmitButton>
+              </Form>
+            </>
+          ) : (
+            <>
+              <Subtitle>Scan this QR code with the Renaissance app to sign in</Subtitle>
+              {isCreatingSession ? (
+                <>
+                  <StatusText>Creating session...</StatusText>
+                </>
+              ) : qrError ? (
+                <>
+                  <StatusText $type="error">{qrError}</StatusText>
+                  <RefreshButton onClick={createSession} type="button">
+                    Try Again
+                  </RefreshButton>
+                </>
+              ) : sessionToken ? (
+                <>
+                  <QRCodeContainer>
+                    <QRCodeSVG
+                      value={getQRCodeUrl()}
+                      size={200}
+                      level="M"
+                      includeMargin={false}
+                    />
+                  </QRCodeContainer>
+                  <StatusText>
+                    <PulsingDot />
+                    Waiting for authentication...
+                  </StatusText>
+                  {timeRemaining > 0 && (
+                    <TimerText>Expires in {formatTime(timeRemaining)}</TimerText>
+                  )}
+                  {timeRemaining === 0 && (
+                    <RefreshButton onClick={createSession} type="button">
+                      Refresh QR Code
+                    </RefreshButton>
+                  )}
+                  <OpenAppLink href="#" onClick={(e) => { e.preventDefault(); handleOpenApp(); }}>
+                    Open Renaissance app instead
+                  </OpenAppLink>
+                </>
+              ) : null}
+            </>
+          )}
         </FormCard>
       </Container>
     </>
