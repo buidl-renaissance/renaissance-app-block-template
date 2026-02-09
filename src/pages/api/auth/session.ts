@@ -124,6 +124,7 @@ export default async function handler(
         authenticated: true,
         userId: session.userId,
         username: session.username,
+        user: { id: session.userId, username: session.username },
       });
     }
 
